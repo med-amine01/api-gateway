@@ -1,22 +1,6 @@
 version: '3'
 
 services:
-  api-gateway:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: api-gateway
-    image: api-gateway
-    ports:
-      - "8765:8765"
-    networks:
-      - my-network
-    depends_on:
-      server-discovery:
-        condition: service_healthy
-    volumes:
-      - ./target/:/app/target
-
   discovery-server:
     container_name: discovery-server
     image: madchicken98/discovery-server
@@ -29,6 +13,38 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
+
+  config-server:
+    container_name: config-server
+    image: madchicken98/config-server
+    ports:
+      - "8888:8888"
+    networks:
+      - my-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8888/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  api-gateway:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: api-gateway
+    image: api-gateway
+    ports:
+      - "8765:8765"
+    networks:
+      - my-network
+    depends_on:
+      config-server:
+        condition: service_healthy
+    volumes:
+      - ./target/:/app/target
+    environment:
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://discovery-server:8761/eureka
+      SPRING_CLOUD_CONFIG_URI: http://config-server:8888
 
 networks:
   my-network:
